@@ -1,0 +1,31 @@
+name: apply-payload
+
+on:
+  push:
+    paths:
+      - payload.zip
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: apply payload
+        run: |
+          if [ -f payload.zip ]; then
+            mkdir -p /tmp/payload
+            unzip -o payload.zip -d /tmp/payload
+            bash /tmp/payload/apply.sh
+            rm -f payload.zip
+          fi
+      - name: commit and push
+        run: |
+          git config user.name sigco3111
+          git config user.email sigco3111@users.noreply.github.com
+          git add -A
+          git commit -m "chore: apply staged web improvements" || echo "nothing to commit"
+          git push
