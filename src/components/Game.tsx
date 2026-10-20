@@ -723,9 +723,14 @@ export function Game({
     };
   }, [macroRecording]);
 
-  // Joystick mode: virtual joystick on the screen zone
+  // Joystick mode: virtual joystick on the screen zone (touch-primary
+  // devices only). On a desktop this would bind pointer events to the mouse
+  // and turn every click-drag into a phantom joystick that holds arrow keys.
   useEffect(() => {
-    if (touchMode !== "joystick" || !mobileController.current) {
+    const coarsePointer =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(pointer: coarse)").matches;
+    if (touchMode !== "joystick" || !mobileController.current || !coarsePointer) {
       return;
     }
     const joystick = nipple.create({
@@ -877,6 +882,71 @@ export function Game({
       zone.removeEventListener("touchcancel", onTouchCancel);
     };
   }, [touchMode]);
+
+  // Native mouse: the touch overlay (game__event-blocker) covers the whole
+  // game screen, so real mouse events target it instead of the DOS canvas,
+  // where js-dos listens. Forward them so a desktop mouse works in every
+  // mode. Touch is unaffected: its compatibility mouse events are already
+  // suppressed by preventDefault in the touch handlers.
+  useEffect(() => {
+    const zone = mobileController.current;
+    const cv = canvas.current;
+    if (!zone || !cv) {
+      return;
+    }
+
+    let pressed = false;
+
+    const forward = (type: string, e: MouseEvent) => {
+      cv.dispatchEvent(
+        new MouseEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          button: e.button,
+          buttons: e.buttons,
+          clientX: e.clientX,
+          clientY: e.clientY,
+        }),
+      );
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      forward("mousemove", e);
+    };
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0) {
+        return;
+      }
+      pressed = true;
+      forward("mousedown", e);
+    };
+    const onMouseUp = (e: MouseEvent) => {
+      if (e.button !== 0 || !pressed) {
+        return;
+      }
+      pressed = false;
+      forward("mouseup", e);
+    };
+    const onMouseLeave = (e: MouseEvent) => {
+      pressed = false;
+      forward("mouseleave", e);
+    };
+
+    zone.addEventListener("mousemove", onMouseMove);
+    zone.addEventListener("mousedown", onMouseDown);
+    zone.addEventListener("mouseup", onMouseUp);
+    // Releasing outside the screen must still release the DOS button.
+    window.addEventListener("mouseup", onMouseUp);
+    zone.addEventListener("mouseleave", onMouseLeave);
+    return () => {
+      zone.removeEventListener("mousemove", onMouseMove);
+      zone.removeEventListener("mousedown", onMouseDown);
+      zone.removeEventListener("mouseup", onMouseUp);
+      window.removeEventListener("mouseup", onMouseUp);
+      zone.removeEventListener("mouseleave", onMouseLeave);
+    };
+  }, []);
 
   const ignoreStopAndPrevent = useCallback((e: Event) => {
     e.stopPropagation();
