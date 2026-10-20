@@ -896,6 +896,8 @@ export function Game({
     }
 
     let pressed = false;
+    let pressedAt = 0;
+    let pendingRelease: number | undefined;
 
     const forward = (type: string, e: MouseEvent) => {
       cv.dispatchEvent(
@@ -918,7 +920,9 @@ export function Game({
       if (e.button !== 0) {
         return;
       }
+      window.clearTimeout(pendingRelease);
       pressed = true;
+      pressedAt = performance.now();
       forward("mousedown", e);
     };
     const onMouseUp = (e: MouseEvent) => {
@@ -926,9 +930,19 @@ export function Game({
         return;
       }
       pressed = false;
-      forward("mouseup", e);
+      // DOS polls button state per frame; a same-tick down/up can be missed.
+      const elapsed = performance.now() - pressedAt;
+      if (elapsed >= 100) {
+        forward("mouseup", e);
+      } else {
+        pendingRelease = window.setTimeout(
+          () => forward("mouseup", e),
+          100 - elapsed,
+        );
+      }
     };
     const onMouseLeave = (e: MouseEvent) => {
+      window.clearTimeout(pendingRelease);
       pressed = false;
       forward("mouseleave", e);
     };
@@ -940,6 +954,7 @@ export function Game({
     window.addEventListener("mouseup", onMouseUp);
     zone.addEventListener("mouseleave", onMouseLeave);
     return () => {
+      window.clearTimeout(pendingRelease);
       zone.removeEventListener("mousemove", onMouseMove);
       zone.removeEventListener("mousedown", onMouseDown);
       zone.removeEventListener("mouseup", onMouseUp);
