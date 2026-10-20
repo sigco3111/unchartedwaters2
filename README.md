@@ -13,7 +13,7 @@
 
 - 원본 프로젝트: **[wan2land/unchartedwaters2](https://github.com/wan2land/unchartedwaters2)** (원저작자: wan2land)
 - 이 저장소는 원본을 **포크(fork)하여 개선을 이어가는 개인 프로젝트**입니다.
-- 원본 README는 [README.upstream.md](./README.upstream.md)에 그대로 보존되어 있습니다.
+- 원본 README는 [README.en.md](./README.en.md)에 그대로 보존되어 있습니다.
 
 ## 저작권 안내 (중요)
 
@@ -72,7 +72,7 @@
 - 저자 전용 도메인용 `CNAME`(water2.dist.be) 제거
 - js-dos/게임 zip 로딩 경로를 `import.meta.env.BASE_URL` 기준으로 변경
 - GitHub Actions로 자동 빌드·배포 (`.github/workflows/deploy.yml`)
-- README 개편 (원본은 README.upstream.md로 보존)
+- README 개편 (원본은 README.en.md로 보존)
 
 ## 로컬 개발
 
@@ -110,7 +110,7 @@ npm run build    # 프로덕션 빌드 (dist/)
 - DOS에서 탭을 놓치지 않도록 클릭 누름 시간을 100ms로 유지합니다.
 - 터치 마우스: 탭은 클릭, 드래그는 커서 이동입니다. 취소된 터치와 여러 손가락 터치는 클릭하지 않으며 모드 전환 시 방향 입력을 해제합니다.
 - 세이브 백업은 직전 1개를 보관합니다. 복원 후 새로고침해야 적용됩니다.
-- 터치 입력은 사용자 실기기(iPhone)에서 정상 동작을 확인했습니다 (v1.0.6 기준).
+- 터치 입력은 사용자 실기기(iPhone)에서 정상 동작을 확인했습니다 (v1.0.5 기준).
 
 ## v1.0.6 - PC 마우스 클릭 수정
 
@@ -118,4 +118,5 @@ npm run build    # 프로덕션 빌드 (dist/)
   - 터치 입력용 화면 영역이 캔버스를 덮어 마우스 이벤트를 가로막던 문제 해결
   - 모바일용 가상 조이스틱이 데스크톱에서도 생성되어 마우스 입력을 가로채던 문제 해결 (조이스틱은 이제 터치 기기에서만 표시)
 - PC에서 마우스 클릭으로 캐릭터 선택 등 화면 조작이 가능함을 실제 PC 브라우저에서 확인
-- 아이폰 터치 동작도 사용자 실기기에서 정상 동작 확인
+- v1.0.6의 모바일 터치 동작은 모의 터치 환경에서 회귀 검증했으며, 실제 iPhone/Safari 재검증은 하지 못했습니다
+
