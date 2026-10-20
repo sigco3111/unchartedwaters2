@@ -88,6 +88,7 @@ export function Game({
   const joystickCodeBefore = useRef<number | null>(null);
 
   const [enabledToggleFns, setEnabledToggleFns] = useState(false);
+  const [touchMode, setTouchMode] = useState<"joystick" | "mouse">("joystick");
   const [enabledToggleFullscreen, setEnabledToggleFullscreen] = useState(false);
   const [enabledToggleKeyboard, setEnabledToggleKeyboard] = useState(true);
 
@@ -179,9 +180,6 @@ export function Game({
   }, [joystickCode, joystickCodeBefore, handleKeyDown, handleKeyUp]);
 
   const start = useCallback(async () => {
-    const joystick = nipple.create({
-      zone: mobileController.current!,
-    });
     blockAddEventListener(document, ["keydown", "keyup", "keypress"]);
     const db = (database.current = await createIdbFileSystem(mod, 1));
     const { fs, main } = await createDos(canvas.current!);
@@ -198,20 +196,6 @@ export function Game({
 
     document.addEventListener("keydown", handleDocumentKeyDown);
     document.addEventListener("keyup", handleDocumentKeyUp);
-
-    joystick.on("move", (_, data) => {
-      if (data.force > 0.3) {
-        setJoystickCode(
-          JOYSTICK_MAPS[(Math.floor((data.angle.degree - 22.5) / 45) + 8) % 8],
-        );
-      } else {
-        setJoystickCode(null);
-      }
-    });
-
-    joystick.on("end", () => {
-      setJoystickCode(null);
-    });
 
     detectFileChange(fs, saveFile, () => {
       db.save(saveFile, (fs as any).fs.readFile(saveFile)); // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -400,6 +384,130 @@ export function Game({
     setEnabledToggleKeyboard(!enabledToggleKeyboard);
   }, [enabledToggleKeyboard]);
 
+  const toggleTouchMode = useCallback(() => {
+    const next = touchMode === "joystick" ? "mouse" : "joystick";
+    setTouchMode(next);
+    setToastMessage(
+      next === "mouse"
+        ? "터치 마우스 모드: 화면을 터치하면 마우스처럼 동작합니다. (탭=클릭, 드래그=커서 이동)"
+        : "조이스틱 모드: 화면을 드래그하면 가상 조이스틱이 나타납니다.",
+    );
+  }, [touchMode]);
+
+  // Joystick mode: virtual joystick on the screen zone
+  useEffect(() => {
+    if (touchMode !== "joystick" || !mobileController.current) {
+      return;
+    }
+    const joystick = nipple.create({
+      zone: mobileController.current,
+    });
+    joystick.on("move", (_, data) => {
+      if (data.force > 0.3) {
+        setJoystickCode(
+          JOYSTICK_MAPS[(Math.floor((data.angle.degree - 22.5) / 45) + 8) % 8],
+        );
+      } else {
+        setJoystickCode(null);
+      }
+    });
+    joystick.on("end", () => {
+      setJoystickCode(null);
+    });
+    return () => {
+      joystick.destroy();
+    };
+  }, [touchMode]);
+
+  // Mouse mode: touch acts like a mouse on the DOS canvas
+  // (finger = cursor, tap = left click)
+  useEffect(() => {
+    const zone = mobileController.current;
+    const cv = canvas.current;
+    if (touchMode !== "mouse" || !zone || !cv) {
+      return;
+    }
+
+    let touching = false;
+    let startX = 0;
+    let startY = 0;
+    let dragged = false;
+
+    const dispatchMouse = (type: string, touch: Touch) => {
+      cv.dispatchEvent(
+        new MouseEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          button: 0,
+          buttons: type === "mouseup" ? 0 : 1,
+          clientX: touch.clientX,
+          clientY: touch.clientY,
+        }),
+      );
+    };
+
+    const onTouchStart = (e: TouchEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const touch = e.changedTouches[0];
+      if (!touch) {
+        return;
+      }
+      touching = true;
+      dragged = false;
+      startX = touch.clientX;
+      startY = touch.clientY;
+      dispatchMouse("mousemove", touch);
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!touching) {
+        return;
+      }
+      const touch = e.changedTouches[0];
+      if (!touch) {
+        return;
+      }
+      if (
+        Math.abs(touch.clientX - startX) > 10 ||
+        Math.abs(touch.clientY - startY) > 10
+      ) {
+        dragged = true;
+      }
+      dispatchMouse("mousemove", touch);
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!touching) {
+        return;
+      }
+      touching = false;
+      const touch = e.changedTouches[0];
+      if (!touch) {
+        return;
+      }
+      if (!dragged) {
+        dispatchMouse("mousemove", touch);
+        dispatchMouse("mousedown", touch);
+        dispatchMouse("mouseup", touch);
+      }
+    };
+
+    zone.addEventListener("touchstart", onTouchStart, { passive: false });
+    zone.addEventListener("touchmove", onTouchMove, { passive: false });
+    zone.addEventListener("touchend", onTouchEnd, { passive: false });
+    zone.addEventListener("touchcancel", onTouchEnd, { passive: false });
+    return () => {
+      zone.removeEventListener("touchstart", onTouchStart);
+      zone.removeEventListener("touchmove", onTouchMove);
+      zone.removeEventListener("touchend", onTouchEnd);
+      zone.removeEventListener("touchcancel", onTouchEnd);
+    };
+  }, [touchMode]);
+
   const ignoreStopAndPrevent = useCallback((e: Event) => {
     e.stopPropagation();
     e.preventDefault();
@@ -491,6 +599,27 @@ export function Game({
                 <path d="M69.333,51.199l6.401,0c0.711,0 1.066,-0.356 1.066,-1.067l0,-6.399c0,-0.711 -0.355,-1.066 -1.066,-1.067l-6.401,0c-0.711,0 -1.066,0.356 -1.066,1.067l0,6.399c0,0.711 0.355,1.067 1.066,1.067Z" />
                 <path d="M86.4,51.199l6.399,0c0.711,0 1.067,-0.356 1.067,-1.067l0,-6.399c0,-0.711 -0.356,-1.066 -1.067,-1.067l-6.399,0c-0.711,0 -1.068,0.356 -1.068,1.067l0,6.399c0,0.711 0.357,1.067 1.068,1.067Z" />
                 <path d="M93.866,67.199c0,0.711 0.355,1.068 1.066,1.068l14.933,0c0.712,0 1.068,-0.357 1.068,-1.068l0,-23.466c0,-0.711 -0.355,-1.066 -1.068,-1.067l-6.399,0c-0.711,0 -1.067,0.356 -1.067,1.067l0,16l-7.467,0c-0.711,0 -1.066,0.355 -1.066,1.066l0,6.4l0,0Z" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class={`game__header__item ${touchMode === "mouse" ? "" : "game__header__item--disabled"}`}
+              title="터치 마우스 모드 (화면 터치를 마우스처럼 사용)"
+              onClick={toggleTouchMode}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="size-6"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15.042 21.672 13.684 16.6m0 0-2.51 2.225.569-9.47 5.227 7.917-3.286-.672ZM12 2.25V4.5m5.834.166-1.591 1.591M20.25 10.5H18M7.757 8.757l-1.59-1.59M6 10.5H3.75m4.007 4.243-1.591 1.59"
+                />
               </svg>
             </button>
           </div>
