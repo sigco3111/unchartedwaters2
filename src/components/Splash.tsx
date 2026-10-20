@@ -5,6 +5,7 @@ import { GameConfig } from "./Game";
 import logo from "../assets/logo.gif";
 import { IconDropbox } from "./icon/IconDropbox";
 import { IconGithub } from "./icon/IconGithub";
+import { Guide } from "./Guide";
 
 const DBX_CLIENT_ID = "95lb7zut06xyhr8";
 
@@ -87,6 +88,7 @@ interface SplashProps {
 
 export function Splash({ dbx, onChangeDbx, onStartGame }: SplashProps) {
   const [isLoadingDbx, setIsLoadingDbx] = useState<boolean>(true);
+  const [showGuide, setShowGuide] = useState<boolean>(false);
 
   const dropboxLogin = useCallback(() => {
     location.href = new DropboxAuth({
@@ -207,6 +209,14 @@ export function Splash({ dbx, onChangeDbx, onStartGame }: SplashProps) {
             <span>드롭박스 로그인</span>
           </button>
         )}
+        <button type="button" class="menu__item" onClick={() => setShowGuide(true)}>
+          <div class="menu__item__icon size-4">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+            </svg>
+          </div>
+          <span>게임 가이드</span>
+        </button>
         <a
           type="button"
           class="menu__item"
@@ -220,6 +230,7 @@ export function Splash({ dbx, onChangeDbx, onStartGame }: SplashProps) {
           <span>소스코드 / 버그 리포트</span>
         </a>
       </div>
+      {showGuide ? <Guide onClose={() => setShowGuide(false)} /> : null}
     </div>
   );
 }

@@ -83,3 +83,8 @@ npm run build    # 프로덕션 빌드 (dist/)
 
 - 게임 자체 버그/개선: [원본 저장소 이슈](https://github.com/wan2land/unchartedwaters2/issues)
 - 이 포크의 개선 사항: [이 저장소 이슈](https://github.com/sigco3111/unchartedwaters2/issues)
+
+## 3단계: 한국어 가이드 (v0.7.0)
+
+- 시작 화면과 게임 화면 헤더에 '게임 가이드' 버튼 추가
+- 가이드 내용: 버전 선택 안내, PC/모바일 조작법(터치 마우스 모드 포함), 세이브/불러오기(로컬·파일·드롭박스), 문제 해결, 저작권 안내
