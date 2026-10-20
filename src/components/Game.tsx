@@ -92,6 +92,23 @@ export function Game({
   const [touchMode, setTouchMode] = useState<"joystick" | "mouse">("joystick");
   const [showGuide, setShowGuide] = useState<boolean>(false);
   const [autoSail, setAutoSail] = useState<boolean>(false);
+  const macroKey = `uw2macro:${saveFile}`;
+  const [macroRecording, setMacroRecording] = useState<boolean>(false);
+  const [macroPlaying, setMacroPlaying] = useState<boolean>(false);
+  const [hasMacro, setHasMacro] = useState<boolean>(
+    () => !!window.localStorage.getItem(macroKey),
+  );
+  const macroRecordingRef = useRef<boolean>(false);
+  const macroEvents = useRef<
+    (
+      | { t: number; kind: "keydown" | "keyup"; code: number }
+      | { t: number; kind: "click"; x: number; y: number }
+    )[]
+  >([]);
+  const macroStart = useRef<number>(0);
+  const macroDownPos = useRef<{ x: number; y: number; t: number } | null>(null);
+  const playbackTimers = useRef<number[]>([]);
+  const pressedDuringPlayback = useRef<Set<number>>(new Set());
   const [enabledToggleFullscreen, setEnabledToggleFullscreen] = useState(false);
   const [enabledToggleKeyboard, setEnabledToggleKeyboard] = useState(true);
 
@@ -146,11 +163,25 @@ export function Game({
   }, []);
 
   const handleKeyDown = useCallback((code: number) => {
+    if (macroRecordingRef.current && macroEvents.current.length < 5000) {
+      macroEvents.current.push({
+        t: performance.now() - macroStart.current,
+        kind: "keydown",
+        code,
+      });
+    }
     const event = createKeyboardEvent("keydown", code);
     keydownHandlers.current.forEach((handler) => handler(event));
   }, []);
 
   const handleKeyUp = useCallback((code: number) => {
+    if (macroRecordingRef.current && macroEvents.current.length < 5000) {
+      macroEvents.current.push({
+        t: performance.now() - macroStart.current,
+        kind: "keyup",
+        code,
+      });
+    }
     const event = createKeyboardEvent("keyup", code);
     keyupHandlers.current.forEach((handler) => handler(event));
   }, []);
@@ -329,6 +360,146 @@ export function Game({
     );
   }, [autoSail]);
 
+  const stopMacroPlayback = useCallback(
+    (silent = false) => {
+      playbackTimers.current.forEach((t) => window.clearTimeout(t));
+      playbackTimers.current = [];
+      pressedDuringPlayback.current.forEach((code) => handleKeyUp(code));
+      pressedDuringPlayback.current.clear();
+      setMacroPlaying(false);
+      if (!silent) {
+        setToastMessage("매크로 재생을 중지했습니다.");
+      }
+    },
+    [handleKeyUp],
+  );
+
+  const toggleMacroRecording = useCallback(() => {
+    if (macroPlaying) {
+      setToastMessage("🚫 매크로 재생 중에는 녹화할 수 없습니다.");
+      return;
+    }
+    if (macroRecording) {
+      macroRecordingRef.current = false;
+      setMacroRecording(false);
+      const events = macroEvents.current;
+      if (events.length > 0) {
+        window.localStorage.setItem(macroKey, JSON.stringify(events));
+        setHasMacro(true);
+        setToastMessage(
+          `매크로 녹화 완료: ${events.length}개 동작이 저장되었습니다.`,
+        );
+      } else {
+        setToastMessage("녹화된 동작이 없어 저장하지 않았습니다.");
+      }
+    } else {
+      macroEvents.current = [];
+      macroDownPos.current = null;
+      macroStart.current = performance.now();
+      macroRecordingRef.current = true;
+      setMacroRecording(true);
+      setToastMessage(
+        "매크로 녹화를 시작합니다. 키보드·조이스틱 입력과 화면 클릭이 기록됩니다. 끝나면 다시 눌러 중지하세요.",
+      );
+    }
+  }, [macroRecording, macroPlaying, macroKey]);
+
+  const playMacro = useCallback(() => {
+    if (macroRecording) {
+      setToastMessage("🚫 녹화 중에는 재생할 수 없습니다.");
+      return;
+    }
+    if (macroPlaying) {
+      return;
+    }
+    const raw = window.localStorage.getItem(macroKey);
+    if (!raw) {
+      setToastMessage("🚫 저장된 매크로가 없습니다.");
+      return;
+    }
+    let events: typeof macroEvents.current;
+    try {
+      events = JSON.parse(raw);
+    } catch {
+      setToastMessage("🚫 저장된 매크로를 읽을 수 없습니다.");
+      return;
+    }
+    if (!events.length) {
+      setToastMessage("🚫 저장된 매크로가 비어 있습니다.");
+      return;
+    }
+    const input = window.prompt("반복 횟수를 입력하세요 (1-99)", "1");
+    if (input === null) {
+      return;
+    }
+    const loops = Math.max(1, Math.min(99, parseInt(input, 10) || 1));
+    const cv = canvas.current;
+    if (!cv) {
+      return;
+    }
+    setMacroPlaying(true);
+    setToastMessage(
+      `매크로 재생 시작 (${loops}회 반복). 화면 상태는 감지하지 못하니 이상이 보이면 ≡ 메뉴의 매크로 중지를 누르세요.`,
+    );
+    const total = events[events.length - 1].t + 500;
+    let remaining = loops;
+    const runOnce = () => {
+      for (const ev of events) {
+        const id = window.setTimeout(() => {
+          const cvs = canvas.current;
+          if (!cvs) {
+            return;
+          }
+          if (ev.kind === "keydown") {
+            handleKeyDown(ev.code);
+            pressedDuringPlayback.current.add(ev.code);
+          } else if (ev.kind === "keyup") {
+            handleKeyUp(ev.code);
+            pressedDuringPlayback.current.delete(ev.code);
+          } else {
+            const { x: clickX, y: clickY } = ev as { x: number; y: number };
+            const opts = (buttons: number): MouseEventInit => ({
+              bubbles: true,
+              cancelable: true,
+              view: window,
+              button: 0,
+              buttons,
+              clientX: clickX,
+              clientY: clickY,
+            });
+            cvs.dispatchEvent(new MouseEvent("mousemove", opts(1)));
+            cvs.dispatchEvent(new MouseEvent("mousedown", opts(1)));
+            cvs.dispatchEvent(new MouseEvent("mouseup", opts(0)));
+          }
+        }, ev.t);
+        playbackTimers.current.push(id);
+      }
+      remaining -= 1;
+      if (remaining > 0) {
+        playbackTimers.current.push(window.setTimeout(runOnce, total));
+      } else {
+        playbackTimers.current.push(
+          window.setTimeout(() => {
+            pressedDuringPlayback.current.forEach((code) => handleKeyUp(code));
+            pressedDuringPlayback.current.clear();
+            setMacroPlaying(false);
+            setToastMessage("매크로 재생이 끝났습니다.");
+          }, total),
+        );
+      }
+    };
+    runOnce();
+  }, [macroRecording, macroPlaying, macroKey, handleKeyDown, handleKeyUp]);
+
+  const deleteMacro = useCallback(() => {
+    if (!window.confirm("저장된 매크로를 삭제하시겠습니까?")) {
+      return;
+    }
+    window.localStorage.removeItem(macroKey);
+    setHasMacro(false);
+    setToastMessage("저장된 매크로를 삭제했습니다.");
+  }, [macroKey]);
+
   const restoreSaveBackup = useCallback(async () => {
     if (!database.current) {
       return;
@@ -456,6 +627,37 @@ export function Game({
         : "조이스틱 모드: 화면을 드래그하면 가상 조이스틱이 나타납니다.",
     );
   }, [touchMode]);
+
+  // Macro recording: capture clicks on the DOS canvas
+  useEffect(() => {
+    const cv = canvas.current;
+    if (!macroRecording || !cv) {
+      return;
+    }
+    const onDown = (e: MouseEvent) => {
+      macroDownPos.current = {
+        x: e.clientX,
+        y: e.clientY,
+        t: performance.now() - macroStart.current,
+      };
+    };
+    const onUp = (e: MouseEvent) => {
+      const d = macroDownPos.current;
+      macroDownPos.current = null;
+      if (!d || macroEvents.current.length >= 5000) {
+        return;
+      }
+      if (Math.abs(e.clientX - d.x) <= 10 && Math.abs(e.clientY - d.y) <= 10) {
+        macroEvents.current.push({ t: d.t, kind: "click", x: d.x, y: d.y });
+      }
+    };
+    cv.addEventListener("mousedown", onDown, true);
+    cv.addEventListener("mouseup", onUp, true);
+    return () => {
+      cv.removeEventListener("mousedown", onDown, true);
+      cv.removeEventListener("mouseup", onUp, true);
+    };
+  }, [macroRecording]);
 
   // Joystick mode: virtual joystick on the screen zone
   useEffect(() => {
@@ -844,6 +1046,94 @@ export function Game({
             </svg>
             <span>이전 세이브로 되돌리기</span>
           </button>
+          <button
+            type="button"
+            class="game__header__fns__item"
+            onClick={toggleMacroRecording}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill={macroRecording ? "#f87171" : "none"}
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+              className="size-6"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 18.75a6.75 6.75 0 1 0 0-13.5 6.75 6.75 0 0 0 0 13.5Z"
+              />
+            </svg>
+            <span>{macroRecording ? "매크로 녹화 중지" : "매크로 녹화"}</span>
+          </button>
+          <button
+            type="button"
+            class="game__header__fns__item"
+            onClick={playMacro}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+              className="size-6"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"
+              />
+            </svg>
+            <span>{macroPlaying ? "매크로 재생 중…" : "매크로 재생"}</span>
+          </button>
+          {macroPlaying ? (
+            <button
+              type="button"
+              class="game__header__fns__item"
+              onClick={() => stopMacroPlayback()}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="size-6"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z"
+                />
+              </svg>
+              <span>매크로 중지</span>
+            </button>
+          ) : null}
+          {hasMacro && !macroPlaying ? (
+            <button
+              type="button"
+              class="game__header__fns__item"
+              onClick={deleteMacro}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="size-6"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
+                />
+              </svg>
+              <span>매크로 삭제</span>
+            </button>
+          ) : null}
           <button
             type="button"
             class="game__header__fns__item"
