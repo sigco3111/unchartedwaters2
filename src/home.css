@@ -185,7 +185,7 @@
 
   /** Toast **/
   .toast {
-    @apply absolute bottom-6 left-1/2 -translate-x-1/2 px-2 py-1.5 bg-white/80 pointer-events-none rounded-sm transition-opacity duration-500 opacity-0 text-sm whitespace-pre text-center;
+    @apply absolute bottom-6 left-1/2 -translate-x-1/2 px-2 py-1.5 bg-white/80 pointer-events-none rounded-sm transition-opacity duration-500 opacity-0 text-sm whitespace-pre-line text-center max-w-[calc(100vw-1rem)] w-max;
   }
 
   .toast--active {

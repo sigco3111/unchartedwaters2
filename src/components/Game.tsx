@@ -758,6 +758,8 @@ export function Game({
     }
 
     let activeTouchId: number | null = null;
+    let pendingRelease: number | undefined;
+    let pressedTouch: Touch | null = null;
     let startX = 0;
     let startY = 0;
     let dragged = false;
@@ -839,8 +841,17 @@ export function Game({
       if (!dragged && Math.abs(touch.clientX - startX) <= 10 &&
           Math.abs(touch.clientY - startY) <= 10) {
         dispatchMouse("mousemove", touch);
+        // DOS polls button state per frame; a same-tick down/up can be missed.
+        if (pressedTouch) {
+          window.clearTimeout(pendingRelease);
+          dispatchMouse("mouseup", pressedTouch);
+        }
         dispatchMouse("mousedown", touch);
-        dispatchMouse("mouseup", touch);
+        pressedTouch = touch;
+        pendingRelease = window.setTimeout(() => {
+          dispatchMouse("mouseup", touch);
+          pressedTouch = null;
+        }, 100);
         showTapIndicator(touch.clientX, touch.clientY);
       }
     };
@@ -856,6 +867,10 @@ export function Game({
     zone.addEventListener("touchend", onTouchEnd, { passive: false });
     zone.addEventListener("touchcancel", onTouchCancel, { passive: false });
     return () => {
+      window.clearTimeout(pendingRelease);
+      if (pressedTouch) {
+        dispatchMouse("mouseup", pressedTouch);
+      }
       zone.removeEventListener("touchstart", onTouchStart);
       zone.removeEventListener("touchmove", onTouchMove);
       zone.removeEventListener("touchend", onTouchEnd);
