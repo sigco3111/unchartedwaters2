@@ -95,6 +95,7 @@ export function Game({
   const macroKey = `uw2macro:${saveFile}`;
   const [macroRecording, setMacroRecording] = useState<boolean>(false);
   const [macroPlaying, setMacroPlaying] = useState<boolean>(false);
+  const [showRepeatPicker, setShowRepeatPicker] = useState<boolean>(false);
   const [hasMacro, setHasMacro] = useState<boolean>(
     () => !!window.localStorage.getItem(macroKey),
   );
@@ -428,11 +429,27 @@ export function Game({
       setToastMessage("🚫 저장된 매크로가 비어 있습니다.");
       return;
     }
-    const input = window.prompt("반복 횟수를 입력하세요 (1-99)", "1");
-    if (input === null) {
+    setShowRepeatPicker(true);
+  }, [macroRecording, macroPlaying, macroKey]);
+
+  const startMacroPlayback = useCallback((loops: number) => {
+    setShowRepeatPicker(false);
+    const raw = window.localStorage.getItem(macroKey);
+    if (!raw) {
+      setToastMessage("🚫 저장된 매크로가 없습니다.");
       return;
     }
-    const loops = Math.max(1, Math.min(99, parseInt(input, 10) || 1));
+    let events: typeof macroEvents.current;
+    try {
+      events = JSON.parse(raw);
+    } catch {
+      setToastMessage("🚫 저장된 매크로를 읽을 수 없습니다.");
+      return;
+    }
+    if (!events.length) {
+      setToastMessage("🚫 저장된 매크로가 비어 있습니다.");
+      return;
+    }
     const cv = canvas.current;
     if (!cv) {
       return;
@@ -489,7 +506,7 @@ export function Game({
       }
     };
     runOnce();
-  }, [macroRecording, macroPlaying, macroKey, handleKeyDown, handleKeyUp]);
+  }, [macroKey, handleKeyDown, handleKeyUp]);
 
   const deleteMacro = useCallback(() => {
     if (!window.confirm("저장된 매크로를 삭제하시겠습니까?")) {
@@ -1206,6 +1223,43 @@ export function Game({
       <div class={`toast ${toastMessage ? "toast--active" : ""}`}>
         {innerToastMessage}
       </div>
+
+      {macroPlaying ? (
+        <button
+          type="button"
+          class="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-red-600 px-6 py-3 text-base font-bold text-white shadow-xl"
+          onClick={() => stopMacroPlayback()}
+        >
+          ■ 매크로 중지
+        </button>
+      ) : null}
+
+      {showRepeatPicker ? (
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div class="w-full max-w-xs rounded-lg bg-slate-800 p-5 text-center text-slate-100 shadow-xl">
+            <div class="mb-3 text-base font-bold">매크로 반복 횟수</div>
+            <div class="mb-4 grid grid-cols-5 gap-2">
+              {[1, 3, 5, 10, 30].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  class="rounded bg-slate-700 px-2 py-2 text-sm hover:bg-slate-600"
+                  onClick={() => startMacroPlayback(n)}
+                >
+                  {n}회
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              class="rounded bg-slate-700 px-3 py-1 text-sm hover:bg-slate-600"
+              onClick={() => setShowRepeatPicker(false)}
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {showGuide ? <Guide onClose={() => setShowGuide(false)} /> : null}
     </div>
