@@ -210,7 +210,7 @@ export function Splash({ dbx, onChangeDbx, onStartGame }: SplashProps) {
         <a
           type="button"
           class="menu__item"
-          href="https://github.com/wan2land/unchartedwater2"
+          href="https://github.com/sigco3111/unchartedwaters2"
           target="_blank"
           rel="noreferrer"
         >

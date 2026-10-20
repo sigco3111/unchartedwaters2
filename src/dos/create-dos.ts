@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { once, load } from "nano-loader";
 
-const loadJsDos = once(() => load("/static/js-dos/js-dos.js"));
+const loadJsDos = once(() => load(`${import.meta.env.BASE_URL}static/js-dos/js-dos.js`));
 
 export async function createDos(
   canvas: HTMLCanvasElement,
@@ -11,7 +11,7 @@ export async function createDos(
   return await new Promise((resolve) => {
     window
       .Dos(canvas, {
-        wdosboxUrl: "/static/js-dos/wdosbox.js",
+        wdosboxUrl: `${import.meta.env.BASE_URL}static/js-dos/wdosbox.js`,
         SDL_numSimultaneouslyQueuedBuffers: 10,
       } as Record<string, unknown>)
       .ready((fs, main) => resolve({ fs, main }));

@@ -1,44 +1,77 @@
-# Uncharted Waters II for Web
+# 대항해시대2 for Web (개선 포크)
 
 <p align="center">
-  <img src="./screenshot.png" alt="Uncharted Water Play" width="600" />
+  <img src="./screenshot.png" alt="대항해시대2 웹 플레이 화면" width="600" />
 </p>
 
-> [대항해시대 오리진](https://uwo.floor.line.games/kr/main) 2022년 8월 23일 정식 출시!
+코에이의 고전 명작 **대항해시대2(한글판, 1993)** 를 브라우저에서 바로 플레이할 수 있게 해주는 웹 래퍼입니다.
+설치 없이 PC와 모바일 어디서든 실행되고, 세이브는 브라우저에 자동 저장됩니다.
 
-## 소개
+**[▶ 게임 시작하기 (GitHub Pages)](https://sigco3111.github.io/unchartedwaters2/)**
 
-대항해시대 오리진의 소식을 듣고 복습겸 대항해시대2를 플레이하려고 했습니다. 시간이 많이 흘러, 컴퓨터 환경이 많이 변하였습니다.
-도스 환경을 구축하는 프로그램도 원활하게 동작하지 않고, 키보드는 텐키리스를 사용해서 항해할 때 조작도 복잡하였습니다.
+## 이 저장소는
 
-저 같은 사람이 분명히 많을 거 같아 대항해시대2(한글판)를 웹에서 할 수 있도록 작업하였습니다.
+- 원본 프로젝트: **[wan2land/unchartedwaters2](https://github.com/wan2land/unchartedwaters2)** (원저작자: wan2land)
+- 이 저장소는 원본을 **포크(fork)하여 개선을 이어가는 개인 프로젝트**입니다.
+- 원본 README는 [README.upstream.md](./README.upstream.md)에 그대로 보존되어 있습니다.
+
+## 저작권 안내 (중요)
+
+- 게임 데이터(`game/` 폴더의 `water2.zip`)는 **코에이(KOEI)의 상용 게임 '대항해시대2' 원본**이며, 저작권은 코에이 및 권리자에게 있습니다.
+- 함께 포함된 팬 제작 모드(교정판, 에르네스트, 정화편, 밀란다/살바도르편 등)는 각 제작자(네이버 카페 대항해시대2 커뮤니티)의 저작물입니다.
+- 래퍼 코드의 저작권은 원저작자(wan2land)에게 있으며, 원본 저장소에는 별도의 오픈소스 라이선스가 명시되어 있지 않습니다.
+- 이 포크는 **비상업적 팬 프로젝트**로, 권리자 또는 원저작자의 삭제 요청이 있으면 저장소와 배포 페이지를 즉시 내립니다.
+
+## 실행 환경
+
+- 인터넷 익스플로러는 지원하지 않습니다. **크롬, 파이어폭스, 사파리 또는 모바일 브라우저**에서 실행하세요.
+- 별도 서버가 필요 없는 정적 사이트입니다 (GitHub Pages).
 
 ## 사용법
 
 - 공통
-  - 게임내 저장파일은 브라우저 자체(IndexedDB)에 저장됩니다. 브라우저를 종료해도 저장파일이 계속 남아있습니다.
-- 데스크탑 + 풀키보드 배열을 사용하는 경우
-  - 오리지날 키매핑으로 게임 진행이 가능합니다.
-- 데스크탑 + 텐키리스 배열을 사용하는 경우
-  - 항해시 방향키를 사용할 수 있습니다.
-  - `Q`, `W`, `E`, `R` 키를 이용하여 메뉴를 활성화 할 수 있습니다.
-- 모바일의 경우
-  - 가상 키패드를 활용해서 게임을 진행할 수 있습니다.
+  - 게임 내 세이브는 브라우저(IndexedDB)에 저장됩니다. 브라우저를 종료해도 유지됩니다.
+  - Dropbox 계정을 연결하면 세이브를 여러 기기에서 동기화할 수 있습니다.
+- 데스크탑 + 풀키보드: 오리지널 키 매핑 그대로 플레이 가능합니다.
+- 데스크탑 + 텐키리스:
+  - 항해 시 방향키를 사용할 수 있습니다.
+  - `Q`, `W`, `E`, `R` 키로 메뉴를 활성화할 수 있습니다.
+- 모바일: 가상 키패드와 가상 조이스틱으로 진행합니다.
 
-## 모드
+## 포함된 모드
 
-- [교정버전 v1.08](https://cafe.naver.com/daehangs/73594)
-- [에르네스트 모드 v1.11](https://cafe.naver.com/daehangs/71466)
+- [버그/번역 교정판 v1.08](https://cafe.naver.com/daehangs/73594)
 - [정화편(기본판) v3.0](https://cafe.naver.com/daehangs/52187)
-- [밀란다 / 살바도르편 20216.11.26](https://cafe.naver.com/daehangs/66350)
+- [에르네스트 모드 v1.11](https://cafe.naver.com/daehangs/71466)
+- [밀란다 / 살바도르편 2016.11.26](https://cafe.naver.com/daehangs/66350)
 
-## 실행
+## 기술 스택
 
-**윈도우 익스플로러**는 지원하지 않습니다. 반드시 [크롬](https://www.google.com/chrome/)이나, [파이어폭스](https://www.mozilla.org/ko/firefox/new/),
-또는, 모바일 브라우저에서 실행해주시기 바랍니다.
+- **js-dos 6.22** (DOSBox WASM): 원본 DOS 게임을 브라우저에서 실행
+- **Preact + TypeScript + Vite 5 + Tailwind CSS**: 래퍼 UI
+- **nipplejs**: 모바일 가상 조이스틱
+- **IndexedDB**: 세이브 파일 로컬 저장
+- **Dropbox SDK**: 세이브 클라우드 동기화 (선택 기능)
 
-**[게임 시작하기](https://water2.dist.be)**
+## 이 포크의 변경 사항
 
-## 문의하기
+### 1단계 - GitHub Pages 배포 대응 (v0.5.4 기반)
 
-게임 중 버그나 개선할 사항, 질문 등이 있다면 [이슈 페이지](https://github.com/wan2land/unchartedwater2/issues)에 작성해주세요. 시간 날 때 천천히 해결해놓겠습니다.
+- `vite.config.ts`에 `base: "/unchartedwaters2/"` 적용, GitHub Pages 서브 경로에서 정상 동작하도록 정적 자산 경로 수정
+- 저자 전용 도메인용 `CNAME`(water2.dist.be) 제거
+- js-dos/게임 zip 로딩 경로를 `import.meta.env.BASE_URL` 기준으로 변경
+- GitHub Actions로 자동 빌드·배포 (`.github/workflows/deploy.yml`)
+- README 개편 (원본은 README.upstream.md로 보존)
+
+## 로컬 개발
+
+```bash
+npm install
+npm run dev      # 개발 서버
+npm run build    # 프로덕션 빌드 (dist/)
+```
+
+## 문의
+
+- 게임 자체 버그/개선: [원본 저장소 이슈](https://github.com/wan2land/unchartedwaters2/issues)
+- 이 포크의 개선 사항: [이 저장소 이슈](https://github.com/sigco3111/unchartedwaters2/issues)

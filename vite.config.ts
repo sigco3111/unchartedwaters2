@@ -3,14 +3,11 @@ import preact from "@preact/preset-vite";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 
 export default defineConfig({
+  base: "/unchartedwaters2/",
   plugins: [
     preact(),
     viteStaticCopy({
       targets: [
-        {
-          src: "CNAME",
-          dest: "",
-        },
         {
           src: "static/*",
           dest: "static",
