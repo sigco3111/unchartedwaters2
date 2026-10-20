@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: apply payload
         run: |
-          PAYLOAD=$(ls -t *payload.zip 2>/dev/null | head -1)
+          PAYLOAD=$(ls *payload.zip 2>/dev/null | sort -V | tail -1)
           if [ -n "$PAYLOAD" ]; then
             mkdir -p /tmp/payload
             unzip -o "$PAYLOAD" -d /tmp/payload
