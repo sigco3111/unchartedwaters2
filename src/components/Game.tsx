@@ -678,6 +678,11 @@ export function Game({
   }, [enabledToggleKeyboard]);
 
   const toggleTouchMode = useCallback(() => {
+    setJoystickCode(null);
+    if (joystickCodeBefore.current) {
+      handleKeyUp(joystickCodeBefore.current);
+      joystickCodeBefore.current = null;
+    }
     const next = touchMode === "joystick" ? "mouse" : "joystick";
     setTouchMode(next);
     setToastMessage(
@@ -685,7 +690,7 @@ export function Game({
         ? "터치 마우스 모드: 화면을 터치하면 마우스처럼 동작합니다. (탭=클릭, 드래그=커서 이동)"
         : "조이스틱 모드: 화면을 드래그하면 가상 조이스틱이 나타납니다.",
     );
-  }, [touchMode]);
+  }, [touchMode, handleKeyUp]);
 
   // Macro recording: capture clicks on the DOS canvas
   useEffect(() => {
@@ -752,7 +757,7 @@ export function Game({
       return;
     }
 
-    let touching = false;
+    let activeTouchId: number | null = null;
     let startX = 0;
     let startY = 0;
     let dragged = false;
@@ -783,11 +788,16 @@ export function Game({
     const onTouchStart = (e: TouchEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      // A second finger cancels the gesture rather than selecting an item.
+      if (activeTouchId !== null || e.touches.length !== 1) {
+        activeTouchId = null;
+        return;
+      }
       const touch = e.changedTouches[0];
       if (!touch) {
         return;
       }
-      touching = true;
+      activeTouchId = touch.identifier;
       dragged = false;
       startX = touch.clientX;
       startY = touch.clientY;
@@ -796,10 +806,12 @@ export function Game({
     const onTouchMove = (e: TouchEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      if (!touching) {
+      if (activeTouchId === null) {
         return;
       }
-      const touch = e.changedTouches[0];
+      const touch = Array.from(e.changedTouches).find(
+        (item) => item.identifier === activeTouchId,
+      );
       if (!touch) {
         return;
       }
@@ -814,15 +826,18 @@ export function Game({
     const onTouchEnd = (e: TouchEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      if (!touching) {
+      if (activeTouchId === null) {
         return;
       }
-      touching = false;
-      const touch = e.changedTouches[0];
+      const touch = Array.from(e.changedTouches).find(
+        (item) => item.identifier === activeTouchId,
+      );
       if (!touch) {
         return;
       }
-      if (!dragged) {
+      activeTouchId = null;
+      if (!dragged && Math.abs(touch.clientX - startX) <= 10 &&
+          Math.abs(touch.clientY - startY) <= 10) {
         dispatchMouse("mousemove", touch);
         dispatchMouse("mousedown", touch);
         dispatchMouse("mouseup", touch);
@@ -830,15 +845,21 @@ export function Game({
       }
     };
 
+    const onTouchCancel = (e: TouchEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      activeTouchId = null;
+    };
+
     zone.addEventListener("touchstart", onTouchStart, { passive: false });
     zone.addEventListener("touchmove", onTouchMove, { passive: false });
     zone.addEventListener("touchend", onTouchEnd, { passive: false });
-    zone.addEventListener("touchcancel", onTouchEnd, { passive: false });
+    zone.addEventListener("touchcancel", onTouchCancel, { passive: false });
     return () => {
       zone.removeEventListener("touchstart", onTouchStart);
       zone.removeEventListener("touchmove", onTouchMove);
       zone.removeEventListener("touchend", onTouchEnd);
-      zone.removeEventListener("touchcancel", onTouchEnd);
+      zone.removeEventListener("touchcancel", onTouchCancel);
     };
   }, [touchMode]);
 
