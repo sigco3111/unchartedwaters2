@@ -200,7 +200,12 @@ export function Game({
     document.addEventListener("keyup", handleDocumentKeyUp);
 
     detectFileChange(fs, saveFile, () => {
-      db.save(saveFile, (fs as any).fs.readFile(saveFile)); // eslint-disable-line @typescript-eslint/no-explicit-any
+      const nextSave = (fs as any).fs.readFile(saveFile); // eslint-disable-line @typescript-eslint/no-explicit-any
+      db.load(saveFile).then((prev) => {
+        const tasks = prev ? [db.save(`${saveFile}.backup`, prev)] : [];
+        tasks.push(db.save(saveFile, nextSave));
+        return Promise.all(tasks);
+      });
       setToastMessage("세이브 파일이 브라우저에 저장되었습니다.");
       isClearExit.current = true;
       setTimeout(() => {
@@ -309,6 +314,48 @@ export function Game({
       "세이브 파일이 브라우저에 저장되었습니다.\n새로고침 후 파일을 불러 올 수 있습니다.",
     );
   }, [saveFile]);
+
+  const restoreSaveBackup = useCallback(async () => {
+    if (!database.current) {
+      return;
+    }
+    const backup = await database.current.load(`${saveFile}.backup`);
+    if (!backup) {
+      setToastMessage("🚫 되돌릴 이전 세이브가 없습니다.");
+      return;
+    }
+    if (
+      !confirm(
+        "이전 세이브로 되돌리면 현재 진행은 백업으로 보관되고, 이전 세이브가 복원됩니다.\n계속 진행하시겠습니까?",
+      )
+    ) {
+      return;
+    }
+    const current = await database.current.load(saveFile);
+    await database.current.save(saveFile, backup);
+    if (current) {
+      await database.current.save(`${saveFile}.backup`, current);
+    }
+    setToastMessage("이전 세이브가 복원되었습니다.\n새로고침 후 적용됩니다.");
+  }, [saveFile]);
+
+  const captureScreenshot = useCallback(() => {
+    const cv = canvas.current;
+    if (!cv) {
+      return;
+    }
+    cv.toBlob((blob) => {
+      if (!blob) {
+        setToastMessage("🚫 화면을 캡처할 수 없습니다.");
+        return;
+      }
+      const d = new Date();
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+      saveAs(blob, `unchartedwaters2-${stamp}.png`);
+      setToastMessage("현재 화면이 이미지 파일로 저장되었습니다.");
+    }, "image/png");
+  }, []);
 
   const syncSaveFileToDropbox = useCallback(async () => {
     if (!dbx) {
@@ -645,6 +692,32 @@ export function Game({
                 />
               </svg>
             </button>
+            <button
+              type="button"
+              class="game__header__item"
+              title="화면 캡처 (현재 화면을 이미지로 저장)"
+              onClick={captureScreenshot}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="size-6"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z"
+                />
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -714,6 +787,27 @@ export function Game({
               />
             </svg>
             <span>세이브 파일 가져오기</span>
+          </button>
+          <button
+            type="button"
+            class="game__header__fns__item"
+            onClick={restoreSaveBackup}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+              className="size-6"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"
+              />
+            </svg>
+            <span>이전 세이브로 되돌리기</span>
           </button>
           <button
             type="button"
