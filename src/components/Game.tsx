@@ -91,6 +91,7 @@ export function Game({
   const [enabledToggleFns, setEnabledToggleFns] = useState(false);
   const [touchMode, setTouchMode] = useState<"joystick" | "mouse">("joystick");
   const [showGuide, setShowGuide] = useState<boolean>(false);
+  const [autoSail, setAutoSail] = useState<boolean>(false);
   const [enabledToggleFullscreen, setEnabledToggleFullscreen] = useState(false);
   const [enabledToggleKeyboard, setEnabledToggleKeyboard] = useState(true);
 
@@ -172,14 +173,17 @@ export function Game({
     if (joystickCode === joystickCodeBefore.current) {
       return;
     }
-    if (joystickCodeBefore.current) {
-      handleKeyUp(joystickCodeBefore.current);
-    }
     if (joystickCode) {
+      if (joystickCodeBefore.current) {
+        handleKeyUp(joystickCodeBefore.current);
+      }
       handleKeyDown(joystickCode);
+      joystickCodeBefore.current = joystickCode;
+    } else if (!autoSail && joystickCodeBefore.current) {
+      handleKeyUp(joystickCodeBefore.current);
+      joystickCodeBefore.current = null;
     }
-    joystickCodeBefore.current = joystickCode;
-  }, [joystickCode, joystickCodeBefore, handleKeyDown, handleKeyUp]);
+  }, [joystickCode, autoSail, joystickCodeBefore, handleKeyDown, handleKeyUp]);
 
   const start = useCallback(async () => {
     blockAddEventListener(document, ["keydown", "keyup", "keypress"]);
@@ -314,6 +318,16 @@ export function Game({
       "세이브 파일이 브라우저에 저장되었습니다.\n새로고침 후 파일을 불러 올 수 있습니다.",
     );
   }, [saveFile]);
+
+  const toggleAutoSail = useCallback(() => {
+    const next = !autoSail;
+    setAutoSail(next);
+    setToastMessage(
+      next
+        ? "자동 항해 켜짐: 조이스틱으로 방향을 잡은 뒤 손을 떼면 그 방향으로 계속 항해합니다. 멈추려면 버튼을 다시 누르세요."
+        : "자동 항해 꺼짐: 고정된 방향을 해제했습니다.",
+    );
+  }, [autoSail]);
 
   const restoreSaveBackup = useCallback(async () => {
     if (!database.current) {
@@ -715,6 +729,27 @@ export function Game({
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z"
+                />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class={`game__header__item ${autoSail ? "" : "game__header__item--disabled"}`}
+              title="자동 항해 (조이스틱 방향 고정)"
+              onClick={toggleAutoSail}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="size-6"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"
                 />
               </svg>
             </button>
