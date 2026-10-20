@@ -3,7 +3,7 @@ name: apply-payload
 on:
   push:
     paths:
-      - payload.zip
+      - "*payload.zip"
   workflow_dispatch:
 
 permissions:
@@ -16,11 +16,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: apply payload
         run: |
-          if [ -f payload.zip ]; then
+          PAYLOAD=$(ls *payload.zip 2>/dev/null | head -1)
+          if [ -n "$PAYLOAD" ]; then
             mkdir -p /tmp/payload
-            unzip -o payload.zip -d /tmp/payload
+            unzip -o "$PAYLOAD" -d /tmp/payload
             bash /tmp/payload/apply.sh
-            rm -f payload.zip
+            rm -f "$PAYLOAD"
           fi
       - name: commit and push
         run: |
