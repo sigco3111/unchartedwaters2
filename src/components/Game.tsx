@@ -87,6 +87,8 @@ export function Game({
 
   const [joystickCode, setJoystickCode] = useState<number | null>(null);
   const joystickCodeBefore = useRef<number | null>(null);
+  const saveQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const restoredPendingReload = useRef(false);
 
   const [enabledToggleFns, setEnabledToggleFns] = useState(false);
   const [touchMode, setTouchMode] = useState<"joystick" | "mouse">("joystick");
@@ -217,6 +219,20 @@ export function Game({
     }
   }, [joystickCode, autoSail, joystickCodeBefore, handleKeyDown, handleKeyUp]);
 
+  const enqueueSavePersist = useCallback(
+    (task: (db: IdbFileSystem) => Promise<void>) => {
+      saveQueue.current = saveQueue.current
+        .then(async () => {
+          const db = database.current;
+          if (db) {
+            await task(db);
+          }
+        })
+        .catch((e) => console.error("save persist failed", e));
+    },
+    [],
+  );
+
   const start = useCallback(async () => {
     blockAddEventListener(document, ["keydown", "keyup", "keypress"]);
     const db = (database.current = await createIdbFileSystem(mod, 1));
@@ -237,12 +253,27 @@ export function Game({
 
     detectFileChange(fs, saveFile, () => {
       const nextSave = (fs as any).fs.readFile(saveFile); // eslint-disable-line @typescript-eslint/no-explicit-any
-      db.load(saveFile).then((prev) => {
-        const tasks = prev ? [db.save(`${saveFile}.backup`, prev)] : [];
-        tasks.push(db.save(saveFile, nextSave));
-        return Promise.all(tasks);
+      enqueueSavePersist(async (persistDb) => {
+        if (restoredPendingReload.current) {
+          setToastMessage(
+            "복원 대기 중입니다. 새로고침 후 이전 세이브가 적용되며, 그 전까지의 진행은 저장되지 않습니다.",
+          );
+          return;
+        }
+        const prev = await persistDb.load(saveFile);
+        if (
+          prev &&
+          prev.length === nextSave.length &&
+          prev.every((b, i) => b === nextSave[i])
+        ) {
+          return;
+        }
+        await persistDb.save(saveFile, nextSave);
+        if (prev) {
+          await persistDb.save(`${saveFile}.backup`, prev);
+        }
+        setToastMessage("세이브 파일이 브라우저에 저장되었습니다.");
       });
-      setToastMessage("세이브 파일이 브라우저에 저장되었습니다.");
       isClearExit.current = true;
       setTimeout(() => {
         isClearExit.current = false;
@@ -303,11 +334,25 @@ export function Game({
     ) {
       return;
     }
-    await database.current.delete(saveFile);
-    setToastMessage(
-      "세이브 파일이 삭제되었습니다.\n새로고침 후 새로운 게임을 시작할 수 있습니다.",
-    );
-  }, [saveFile]);
+    enqueueSavePersist(async (persistDb) => {
+      const current = await persistDb.load(saveFile);
+      if (current) {
+        const prevBackup = await persistDb.load(`${saveFile}.backup`);
+        const sameAsBackup =
+          prevBackup &&
+          prevBackup.length === current.length &&
+          prevBackup.every((b, i) => b === current[i]);
+        if (!sameAsBackup) {
+          await persistDb.save(`${saveFile}.backup`, current);
+        }
+      }
+      await persistDb.delete(saveFile);
+      restoredPendingReload.current = false;
+      setToastMessage(
+        "세이브 파일이 삭제되었습니다(이전 진행은 백업에 보관).\n새로고침 후 새로운 게임을 시작할 수 있습니다.",
+      );
+    });
+  }, [saveFile, enqueueSavePersist]);
 
   const downloadSaveFile = useCallback(async () => {
     if (!database.current) {
@@ -533,13 +578,21 @@ export function Game({
     ) {
       return;
     }
-    const current = await database.current.load(saveFile);
-    await database.current.save(saveFile, backup);
-    if (current) {
-      await database.current.save(`${saveFile}.backup`, current);
-    }
-    setToastMessage("이전 세이브가 복원되었습니다.\n새로고침 후 적용됩니다.");
-  }, [saveFile]);
+    enqueueSavePersist(async (persistDb) => {
+      const latestBackup = await persistDb.load(`${saveFile}.backup`);
+      if (!latestBackup) {
+        setToastMessage("🚫 되돌릴 이전 세이브가 없습니다.");
+        return;
+      }
+      const current = await persistDb.load(saveFile);
+      await persistDb.save(saveFile, latestBackup);
+      if (current) {
+        await persistDb.save(`${saveFile}.backup`, current);
+      }
+      restoredPendingReload.current = true;
+      setToastMessage("이전 세이브가 복원되었습니다.\n새로고침 후 적용됩니다.");
+    });
+  }, [saveFile, enqueueSavePersist]);
 
   const captureScreenshot = useCallback(() => {
     const cv = canvas.current;
